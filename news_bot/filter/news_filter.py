@@ -54,7 +54,13 @@ MARKET_EVENT_KEYWORDS = [
 @dataclass
 class FilterResult:
     selected: List[NewsArticle]
-    dropped_count: int
+    duplicate_dropped_count: int
+    irrelevant_dropped_count: int
+    topk_dropped_count: int
+
+    @property
+    def dropped_count(self) -> int:
+        return self.duplicate_dropped_count + self.irrelevant_dropped_count + self.topk_dropped_count
 
 
 def _normalize_text(text: str) -> str:
@@ -66,26 +72,27 @@ def _contains_any_keyword(text: str, keywords: Iterable[str]) -> bool:
     return any(keyword in normalized for keyword in keywords)
 
 
+def _article_text_payload(article: NewsArticle) -> str:
+    return f"{article.title} {article.summary} {article.content}".strip()
+
+
 def has_industry_signal(article: NewsArticle) -> bool:
-    payload = f"{article.title} {article.summary}"
-    return _contains_any_keyword(payload, INDUSTRY_KEYWORDS)
+    return _contains_any_keyword(_article_text_payload(article), INDUSTRY_KEYWORDS)
 
 
 def has_market_event_signal(article: NewsArticle) -> bool:
-    payload = f"{article.title} {article.summary}"
-    return _contains_any_keyword(payload, MARKET_EVENT_KEYWORDS)
+    return _contains_any_keyword(_article_text_payload(article), MARKET_EVENT_KEYWORDS)
 
 
 def article_priority_score(article: NewsArticle) -> int:
-    payload = _normalize_text(f"{article.title} {article.summary}")
+    payload = _normalize_text(_article_text_payload(article))
     industry_hits = sum(1 for kw in INDUSTRY_KEYWORDS if kw in payload)
     event_hits = sum(1 for kw in MARKET_EVENT_KEYWORDS if kw in payload)
 
-    # 이벤트 가중치를 조금 더 높여 투자 관련성 우선순위 강화
     return industry_hits + (event_hits * 2)
 
 
-def deduplicate_articles(articles: Iterable[NewsArticle]) -> List[NewsArticle]:
+def deduplicate_articles(articles: Iterable[NewsArticle]) -> tuple[List[NewsArticle], int]:
     unique_map: dict[str, NewsArticle] = {}
 
     for article in articles:
@@ -94,19 +101,29 @@ def deduplicate_articles(articles: Iterable[NewsArticle]) -> List[NewsArticle]:
         if stable_key not in unique_map:
             unique_map[stable_key] = article
 
-    return list(unique_map.values())
+    unique_articles = list(unique_map.values())
+    duplicate_dropped_count = max(0, len(list(articles)) - len(unique_articles))
+    return unique_articles, duplicate_dropped_count
 
 
 def filter_important_news(articles: Iterable[NewsArticle], top_k: int = 15) -> FilterResult:
-    deduped = deduplicate_articles(articles)
+    articles_list = list(articles)
+    deduped, duplicate_dropped_count = deduplicate_articles(articles_list)
 
-    selected = [
+    relevant = [
         article
         for article in deduped
         if has_industry_signal(article) or has_market_event_signal(article)
     ]
+    irrelevant_dropped_count = max(0, len(deduped) - len(relevant))
 
-    selected.sort(key=article_priority_score, reverse=True)
-    selected = selected[:top_k]
+    relevant.sort(key=article_priority_score, reverse=True)
+    selected = relevant[:top_k]
+    topk_dropped_count = max(0, len(relevant) - len(selected))
 
-    return FilterResult(selected=selected, dropped_count=max(0, len(deduped) - len(selected)))
+    return FilterResult(
+        selected=selected,
+        duplicate_dropped_count=duplicate_dropped_count,
+        irrelevant_dropped_count=irrelevant_dropped_count,
+        topk_dropped_count=topk_dropped_count,
+    )

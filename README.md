@@ -24,6 +24,9 @@ news_bot/
   output/
     markdown_writer.py
   main.py
+tests/
+  test_filter.py
+  test_markdown.py
 requirements.txt
 README.md
 ```
@@ -38,7 +41,15 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> 참고: 현재 코드의 핵심 로직은 `feedparser`를 중심으로 동작하며, `requests`, `beautifulsoup4`는 추후 본문 크롤링 확장 시 사용할 수 있도록 요구사항에 포함해두었습니다.
+### 프록시 환경에서 설치가 403으로 실패할 때
+
+- 내부 PyPI 미러가 있다면 아래처럼 설치하세요.
+
+```bash
+python3 -m pip install -r requirements.txt --index-url https://<internal-pypi>/simple --trusted-host <internal-pypi-host>
+```
+
+- 또는 네트워크 팀에 `pypi.org`, `files.pythonhosted.org` 접근 허용을 요청하세요.
 
 ---
 
@@ -50,10 +61,16 @@ pip install -r requirements.txt
 python3 -m news_bot.main
 ```
 
+본문 크롤링까지 포함(선택):
+
+```bash
+python3 -m news_bot.main --fetch-full-text
+```
+
 옵션 예시:
 
 ```bash
-python3 -m news_bot.main --limit-per-source 30 --top-k 20 --output-dir output
+python3 -m news_bot.main --limit-per-source 30 --top-k 20 --output-dir output --fetch-full-text
 ```
 
 실행하면 아래 형식의 파일이 생성됩니다.
@@ -63,6 +80,14 @@ python3 -m news_bot.main --limit-per-source 30 --top-k 20 --output-dir output
 예)
 
 - `output/news_2026_03_09.md`
+
+---
+
+## 테스트 실행
+
+```bash
+python3 -m unittest discover -s tests -v
+```
 
 ---
 
@@ -121,13 +146,3 @@ python3 -m news_bot.main --limit-per-source 30 --top-k 20 --output-dir output
 - `summarizer/news_summarizer.py`: LLM 요약 추가
 - `output/`: Notion/Telegram writer 추가
 - `main.py`: 실행 파이프라인에 후처리 단계 연결
-
----
-
-## 빠른 실행 체크리스트
-
-1. `python3 --version`으로 3.10 이상 확인
-2. 가상환경 생성/활성화
-3. `pip install -r requirements.txt`
-4. `python3 -m news_bot.main`
-5. `output/news_YYYY_MM_DD.md` 파일 확인

@@ -9,38 +9,43 @@ from typing import Iterable
 from news_bot.summarizer.news_summarizer import SummarizedNews
 
 
+def _section(title: str) -> str:
+    return f"\n### {title}\n"
+
+
 def render_markdown(summaries: Iterable[SummarizedNews]) -> str:
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    lines = ["# AI / 주식 뉴스 자동 요약", "", f"- 생성 시각: {now}", ""]
+    lines = [
+        "# AI / 주식 뉴스 자동 요약",
+        "",
+        f"- 생성 시각: {now}",
+        "",
+    ]
 
     for item in summaries:
         lines.append(f"## {item.title}")
-        lines.append(f"출처: {item.link}")
+        lines.append("")
+        lines.append(f"- 출처: {item.source}")
+        lines.append(f"- 발행일: {item.published}")
+        lines.append(f"- 링크: {item.link}")
         lines.append("")
 
-        lines.append("### 3줄 요약")
-        lines.append(f"- {item.three_line_summary[0]}")
-        lines.append(f"- {item.three_line_summary[1]}")
-        lines.append(f"- {item.three_line_summary[2]}")
-        lines.append("")
+        lines.append(_section("핵심 요약"))
+        for i, summary_line in enumerate(item.core_summary_lines, start=1):
+            lines.append(f"{i}. {summary_line}")
 
-        lines.append("### 왜 중요한가")
-        lines.append(f"- {item.why_important}")
-        lines.append("")
+        lines.append(_section("왜 중요한 뉴스인가"))
+        for bullet in item.why_important:
+            lines.append(f"- {bullet}")
 
-        lines.append("### 투자 포인트")
-        companies = ", ".join(item.related_companies) if item.related_companies else "정보 없음"
-        beneficiary = ", ".join(item.beneficiary_sectors) if item.beneficiary_sectors else "정보 없음"
-        risks = ", ".join(item.risk_sectors) if item.risk_sectors else "정보 없음"
-        lines.append(f"- 관련 기업: {companies}")
-        lines.append(f"- 수혜 가능 업종: {beneficiary}")
-        lines.append(f"- 리스크 가능 업종: {risks}")
-        lines.append(f"- 성격: {item.time_horizon}")
-        lines.append("")
+        lines.append(_section("투자자 관점 포인트"))
+        for bullet in item.investor_points:
+            lines.append(f"- {bullet}")
 
-        lines.append("### 인스타 후킹")
-        for hook in item.insta_hooks[:3]:
+        lines.append(_section("인스타 후킹 문장 3개"))
+        for hook in item.insta_hooks:
             lines.append(f"- {hook}")
+
         lines.append("\n---\n")
 
     return "\n".join(lines).strip() + "\n"

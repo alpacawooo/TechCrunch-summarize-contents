@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from html import unescape
-from pathlib import Path
 from typing import Any, Iterable, List
 
 REQUEST_TIMEOUT = 12
@@ -96,23 +95,25 @@ def _entry_to_article(entry: dict[str, Any], source: str, fetch_full_text: bool 
     )
 
 
-def parse_feed_content(
-    xml_content: str | bytes,
+def collect_from_feed(
+    feed_url: str,
     source_name: str,
     limit_per_source: int = 20,
     fetch_full_text: bool = False,
 ) -> List[NewsArticle]:
-    """Parse RSS/Atom xml content into NewsArticle list.
-
-    This helper does not perform network calls, so it can be used by
-    deterministic tests in network-restricted environments.
-    """
     try:
         import feedparser
+        import requests
     except ModuleNotFoundError:
         return []
 
-    parsed = feedparser.parse(xml_content)
+    try:
+        response = requests.get(feed_url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        parsed = feedparser.parse(response.content)
+    except requests.RequestException:
+        return []
+
     if getattr(parsed, "bozo", False) and not getattr(parsed, "entries", []):
         return []
 
@@ -122,50 +123,6 @@ def parse_feed_content(
         if article.title and article.link:
             articles.append(article)
     return articles
-
-
-def collect_from_feed(
-    feed_url: str,
-    source_name: str,
-    limit_per_source: int = 20,
-    fetch_full_text: bool = False,
-) -> List[NewsArticle]:
-    try:
-        import requests
-    except ModuleNotFoundError:
-        return []
-
-    try:
-        response = requests.get(feed_url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT)
-        response.raise_for_status()
-        return parse_feed_content(
-            response.content,
-            source_name=source_name,
-            limit_per_source=limit_per_source,
-            fetch_full_text=fetch_full_text,
-        )
-    except requests.RequestException:
-        return []
-
-
-def collect_from_rss_file(
-    file_path: str | Path,
-    source_name: str,
-    limit_per_source: int = 20,
-    fetch_full_text: bool = False,
-) -> List[NewsArticle]:
-    """Load feed content from a local XML file and parse articles."""
-    try:
-        xml_content = Path(file_path).read_text(encoding="utf-8")
-    except OSError:
-        return []
-
-    return parse_feed_content(
-        xml_content,
-        source_name=source_name,
-        limit_per_source=limit_per_source,
-        fetch_full_text=fetch_full_text,
-    )
 
 
 def collect_all(

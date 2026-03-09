@@ -1,14 +1,15 @@
 # AI / 주식 뉴스 자동 수집 및 요약 프로젝트
 
-AI / 반도체 / 빅테크 / 매크로 관련 RSS 뉴스를 수집해,
-투자 콘텐츠용 요약 markdown을 자동 생성하는 프로젝트입니다.
+초보자도 실행할 수 있도록 만든 **RSS 기반 뉴스 봇**입니다.
 
-기본 파이프라인:
+아래 흐름을 자동으로 실행합니다.
 
 1. RSS 뉴스 수집 (TechCrunch, CNBC, Reuters, Yahoo Finance)
 2. 투자 관련 키워드/이벤트 기준 필터링
-3. 기사별 요약 생성 (OpenAI API 우선, 실패 시 규칙 기반 fallback)
+3. 투자자 관점 요약 생성
 4. Markdown 파일 저장
+
+- 네트워크/프록시 이슈로 특정 RSS가 실패하면 해당 소스는 자동으로 건너뛰고 나머지 소스로 계속 진행합니다.
 
 ---
 
@@ -26,17 +27,8 @@ news_bot/
     markdown_writer.py
   main.py
 tests/
-  fixtures/
-    sample_tech.xml
-  test_collector.py
   test_filter.py
   test_markdown.py
-  test_sample_pipeline.py
-  test_summarizer.py
-.github/
-  workflows/
-    ci-offline.yml
-    live-rss-run.yml
 requirements.txt
 README.md
 ```
@@ -51,19 +43,15 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### OpenAI API 키 설정
+### 프록시 환경에서 설치가 403으로 실패할 때
+
+- 내부 PyPI 미러가 있다면 아래처럼 설치하세요.
 
 ```bash
-export OPENAI_API_KEY="your_api_key_here"
+python3 -m pip install -r requirements.txt --index-url https://<internal-pypi>/simple --trusted-host <internal-pypi-host>
 ```
 
-`.bashrc` 또는 `.zshrc`에 추가하면 매번 재입력하지 않아도 됩니다.
-
-### GitHub Actions Secret 이름
-
-실운영 워크플로우에서 아래 이름으로 등록합니다.
-
-- `OPENAI_API_KEY`
+- 또는 네트워크 팀에 `pypi.org`, `files.pythonhosted.org` 접근 허용을 요청하세요.
 
 ---
 
@@ -84,59 +72,20 @@ python3 -m news_bot.main --fetch-full-text
 옵션 예시:
 
 ```bash
-python3 -m news_bot.main --limit-per-source 30 --top-k 20 --output-dir output --fetch-full-text --model gpt-4o-mini
+python3 -m news_bot.main --limit-per-source 30 --top-k 20 --output-dir output --fetch-full-text
 ```
 
-출력 파일 예시:
+실행하면 아래 형식의 파일이 생성됩니다.
 
 - `output/news_YYYY_MM_DD.md`
 
----
+예)
 
-## 출력 형식
-
-```markdown
-## 기사 제목
-출처: 기사 링크
-
-### 3줄 요약
-- 무슨 일이 있었는지
-- 왜 시장이 반응할 수 있는지
-- 투자자가 체크할 포인트
-
-### 왜 중요한가
-- 이 뉴스가 중요한 이유를 2~3문장으로 설명
-
-### 투자 포인트
-- 관련 기업: Microsoft, NVIDIA
-- 수혜 가능 업종: 데이터센터, 반도체
-- 리스크 가능 업종: ...
-- 성격: 장기 트렌드
-
-### 인스타 후킹
-- 엔비디아만 보면 놓치는 이유
-- 이 뉴스가 AI 투자자에게 중요한 이유
-- 겉으론 호재인데 시장은 왜 다르게 볼까
-```
+- `output/news_2026_03_09.md`
 
 ---
 
-## API 키가 없거나 API 실패 시 동작
-
-프로그램은 중단되지 않고, 기사 제목/요약/링크 기반의 규칙 요약으로 자동 대체됩니다.
-
-- OpenAI 정상 호출 시: 구조화된 고품질 요약 사용
-- `OPENAI_API_KEY` 미설정 시: fallback 요약 사용
-- OpenAI 응답 에러/타임아웃 시: fallback 요약 사용
-
-즉, 운영 환경에서 API 문제가 있어도 markdown 생성은 계속됩니다.
-
----
-
-## 네트워크 제한 환경에서 검증하는 방법
-
-실제 RSS 호출이 어려운 환경(Codex cloud 등)에서도 검증할 수 있도록
-`tests/fixtures/sample_tech.xml` 기반 테스트를 제공합니다.
+## 테스트 실행
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -144,8 +93,58 @@ python3 -m unittest discover -s tests -v
 
 ---
 
-## GitHub Actions 운영 분리
+## 필터링 기준
 
-- `ci-offline.yml`: PR/Push용 테스트 워크플로우(샘플 RSS 기반)
-- `live-rss-run.yml`: 스케줄/수동 실운영 워크플로우(실제 RSS + OpenAI)
+### 1) 산업 키워드
 
+- AI, OpenAI, Anthropic, NVIDIA, Microsoft, Google, Amazon, Tesla
+- Semiconductor, GPU, LLM, Data center, AI chip
+- earnings, guidance, Fed, interest rate
+
+### 2) 시장 영향 이벤트
+
+- 실적 발표, 가이던스 변경
+- 대규모 투자, 인수합병(M&A)
+- 규제 변화, 금리 정책
+- AI 기술 발표, 반도체 공급 변화
+
+### 3) 중복 제거
+
+- 제목 + 링크를 기반으로 해시를 생성해 중복 뉴스 제거
+
+---
+
+## 출력 형식
+
+각 뉴스는 아래 구조로 저장됩니다.
+
+- 기사 제목
+- 출처
+- 핵심 요약 (3줄)
+  1. 무슨 일이 있었는지
+  2. 시장이 왜 반응할 수 있는지
+  3. 투자자가 체크할 포인트
+- 왜 중요한 뉴스인가
+  - AI 산업 영향
+  - 반도체 산업 영향
+  - 빅테크 기업 영향
+  - 금융시장 영향
+- 투자자 관점 포인트
+- 인스타 후킹 문장 3개
+
+---
+
+## 향후 확장 아이디어
+
+현재 구조는 다음 기능을 쉽게 추가할 수 있도록 모듈화되어 있습니다.
+
+- OpenAI API 요약
+- Notion 저장
+- Telegram 알림
+- 인스타 콘텐츠 자동 생성 강화
+
+확장 위치 예시:
+
+- `summarizer/news_summarizer.py`: LLM 요약 추가
+- `output/`: Notion/Telegram writer 추가
+- `main.py`: 실행 파이프라인에 후처리 단계 연결

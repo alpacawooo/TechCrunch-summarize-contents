@@ -24,7 +24,6 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--top-k", type=positive_int, default=15, help="최종 선별 뉴스 개수")
     parser.add_argument("--output-dir", default="output", help="마크다운 파일 저장 디렉터리")
     parser.add_argument("--fetch-full-text", action="store_true", help="RSS 요약 외에 기사 본문도 수집")
-    parser.add_argument("--model", default="gpt-4o-mini", help="OpenAI 모델명")
     return parser.parse_args()
 
 
@@ -37,10 +36,8 @@ def main() -> None:
             raise RuntimeError("RSS 수집 결과가 없습니다. 네트워크/피드 URL을 확인하세요.")
 
         filtered_result = filter_important_news(collected, top_k=args.top_k)
-        if not filtered_result.selected:
-            raise RuntimeError("필터링 후 남은 뉴스가 없습니다. 키워드/수집 범위를 조정하세요.")
+        summarized = summarize_news(filtered_result.selected)
 
-        summarized = summarize_news(filtered_result.selected, model=args.model)
         md_content = render_markdown(summarized)
         output_path = write_markdown_file(md_content, output_dir=args.output_dir)
     except Exception as exc:  # noqa: BLE001

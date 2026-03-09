@@ -1,15 +1,14 @@
 # AI / 주식 뉴스 자동 수집 및 요약 프로젝트
 
-초보자도 실행할 수 있도록 만든 **RSS 기반 뉴스 봇**입니다.
+AI / 반도체 / 빅테크 / 매크로 관련 RSS 뉴스를 수집해,
+투자 콘텐츠용 요약 markdown을 자동 생성하는 프로젝트입니다.
 
-아래 흐름을 자동으로 실행합니다.
+기본 파이프라인:
 
 1. RSS 뉴스 수집 (TechCrunch, CNBC, Reuters, Yahoo Finance)
 2. 투자 관련 키워드/이벤트 기준 필터링
-3. OpenAI API 기반 요약 생성
+3. 기사별 요약 생성 (OpenAI API 우선, 실패 시 규칙 기반 fallback)
 4. Markdown 파일 저장
-
-- 네트워크/프록시 이슈로 특정 RSS가 실패하면 해당 소스는 자동으로 건너뛰고 나머지 소스로 계속 진행합니다.
 
 ---
 
@@ -58,23 +57,19 @@ pip install -r requirements.txt
 export OPENAI_API_KEY="your_api_key_here"
 ```
 
-`.bashrc` 또는 `.zshrc`에 추가해두면 매번 입력하지 않아도 됩니다.
+`.bashrc` 또는 `.zshrc`에 추가하면 매번 재입력하지 않아도 됩니다.
 
-### 프록시 환경에서 설치가 403으로 실패할 때
+### GitHub Actions Secret 이름
 
-- 내부 PyPI 미러가 있다면 아래처럼 설치하세요.
+실운영 워크플로우에서 아래 이름으로 등록합니다.
 
-```bash
-python3 -m pip install -r requirements.txt --index-url https://<internal-pypi>/simple --trusted-host <internal-pypi-host>
-```
-
-- 또는 네트워크 팀에 `pypi.org`, `files.pythonhosted.org` 접근 허용을 요청하세요.
+- `OPENAI_API_KEY`
 
 ---
 
 ## 실행 방법
 
-기본 실행(실제 RSS 호출):
+기본 실행:
 
 ```bash
 python3 -m news_bot.main
@@ -92,13 +87,9 @@ python3 -m news_bot.main --fetch-full-text
 python3 -m news_bot.main --limit-per-source 30 --top-k 20 --output-dir output --fetch-full-text --model gpt-4o-mini
 ```
 
-실행하면 아래 형식의 파일이 생성됩니다.
+출력 파일 예시:
 
 - `output/news_YYYY_MM_DD.md`
-
-예)
-
-- `output/news_2026_03_09.md`
 
 ---
 
@@ -106,36 +97,46 @@ python3 -m news_bot.main --limit-per-source 30 --top-k 20 --output-dir output --
 
 ```markdown
 ## 기사 제목
-출처: 링크
+출처: 기사 링크
 
 ### 3줄 요약
 - 무슨 일이 있었는지
-- 왜 중요한지
-- 투자자 관점에서 볼 포인트
+- 왜 시장이 반응할 수 있는지
+- 투자자가 체크할 포인트
+
+### 왜 중요한가
+- 이 뉴스가 중요한 이유를 2~3문장으로 설명
 
 ### 투자 포인트
-- ...
-
-### 추가 항목
-- 관련 기업: ...
-- 시장 영향도: 낮음/중간/높음
+- 관련 기업: Microsoft, NVIDIA
+- 수혜 가능 업종: 데이터센터, 반도체
+- 리스크 가능 업종: ...
+- 성격: 장기 트렌드
 
 ### 인스타 후킹
-- ...
-- ...
-- ...
+- 엔비디아만 보면 놓치는 이유
+- 이 뉴스가 AI 투자자에게 중요한 이유
+- 겉으론 호재인데 시장은 왜 다르게 볼까
 ```
+
+---
+
+## API 키가 없거나 API 실패 시 동작
+
+프로그램은 중단되지 않고, 기사 제목/요약/링크 기반의 규칙 요약으로 자동 대체됩니다.
+
+- OpenAI 정상 호출 시: 구조화된 고품질 요약 사용
+- `OPENAI_API_KEY` 미설정 시: fallback 요약 사용
+- OpenAI 응답 에러/타임아웃 시: fallback 요약 사용
+
+즉, 운영 환경에서 API 문제가 있어도 markdown 생성은 계속됩니다.
 
 ---
 
 ## 네트워크 제한 환경에서 검증하는 방법
 
-Codex cloud처럼 RSS 실호출이 차단된 환경에서도 검증할 수 있도록 `tests/fixtures/sample_tech.xml`을 사용한 테스트를 추가했습니다.
-
-- `test_collect_from_local_sample_rss_file`: 샘플 XML 파싱 검증
-- `test_pipeline_with_sample_rss_runs_without_network`: 수집→필터→요약(목킹)→마크다운 전체 흐름 검증
-
-실행:
+실제 RSS 호출이 어려운 환경(Codex cloud 등)에서도 검증할 수 있도록
+`tests/fixtures/sample_tech.xml` 기반 테스트를 제공합니다.
 
 ```bash
 python3 -m unittest discover -s tests -v
@@ -145,12 +146,6 @@ python3 -m unittest discover -s tests -v
 
 ## GitHub Actions 운영 분리
 
-- `ci-offline.yml`: PR/Push 시 실행되는 기본 CI. 샘플 RSS 기반 테스트 포함(네트워크 제한 환경에서도 재현 가능)
-- `live-rss-run.yml`: 스케줄/수동 실행으로 실제 RSS 수집 + OpenAI 요약 실행
-
-실운영 워크플로우(`live-rss-run.yml`)를 사용하려면 저장소 Secret에 아래를 등록하세요.
-
-- `OPENAI_API_KEY`
-
-워크플로우 실행 후 생성된 markdown은 `daily-news-markdown` 아티팩트로 업로드됩니다.
+- `ci-offline.yml`: PR/Push용 테스트 워크플로우(샘플 RSS 기반)
+- `live-rss-run.yml`: 스케줄/수동 실운영 워크플로우(실제 RSS + OpenAI)
 

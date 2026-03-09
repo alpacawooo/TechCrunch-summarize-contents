@@ -13,9 +13,11 @@ class SamplePipelineTests(unittest.TestCase):
     def test_pipeline_with_sample_rss_runs_without_network(self, mock_call):
         mock_call.return_value = {
             "three_line_summary": ["line1", "line2", "line3"],
-            "investor_point": "point",
+            "why_important": "중요",
             "related_companies": ["NVIDIA"],
-            "market_impact": "중간",
+            "beneficiary_sectors": ["반도체"],
+            "risk_sectors": ["소비재"],
+            "time_horizon": "장기 트렌드",
             "insta_hooks": ["h1", "h2", "h3"],
         }
 
@@ -28,6 +30,7 @@ class SamplePipelineTests(unittest.TestCase):
         self.assertGreaterEqual(len(collected), 3)
         self.assertGreaterEqual(len(filtered.selected), 1)
         self.assertIn("### 3줄 요약", markdown)
+        self.assertIn("### 왜 중요한가", markdown)
         self.assertIn("### 인스타 후킹", markdown)
 
 

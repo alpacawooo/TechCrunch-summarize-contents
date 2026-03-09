@@ -24,14 +24,18 @@ def render_markdown(summaries: Iterable[SummarizedNews]) -> str:
         lines.append(f"- {item.three_line_summary[2]}")
         lines.append("")
 
-        lines.append("### 투자 포인트")
-        lines.append(f"- {item.investor_point}")
+        lines.append("### 왜 중요한가")
+        lines.append(f"- {item.why_important}")
         lines.append("")
 
-        lines.append("### 추가 항목")
+        lines.append("### 투자 포인트")
         companies = ", ".join(item.related_companies) if item.related_companies else "정보 없음"
+        beneficiary = ", ".join(item.beneficiary_sectors) if item.beneficiary_sectors else "정보 없음"
+        risks = ", ".join(item.risk_sectors) if item.risk_sectors else "정보 없음"
         lines.append(f"- 관련 기업: {companies}")
-        lines.append(f"- 시장 영향도: {item.market_impact}")
+        lines.append(f"- 수혜 가능 업종: {beneficiary}")
+        lines.append(f"- 리스크 가능 업종: {risks}")
+        lines.append(f"- 성격: {item.time_horizon}")
         lines.append("")
 
         lines.append("### 인스타 후킹")

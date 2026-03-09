@@ -37,8 +37,10 @@ def main() -> None:
             raise RuntimeError("RSS 수집 결과가 없습니다. 네트워크/피드 URL을 확인하세요.")
 
         filtered_result = filter_important_news(collected, top_k=args.top_k)
-        summarized = summarize_news(filtered_result.selected, model=args.model)
+        if not filtered_result.selected:
+            raise RuntimeError("필터링 후 남은 뉴스가 없습니다. 키워드/수집 범위를 조정하세요.")
 
+        summarized = summarize_news(filtered_result.selected, model=args.model)
         md_content = render_markdown(summarized)
         output_path = write_markdown_file(md_content, output_dir=args.output_dir)
     except Exception as exc:  # noqa: BLE001

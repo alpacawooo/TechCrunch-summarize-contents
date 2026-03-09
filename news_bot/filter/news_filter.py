@@ -88,27 +88,26 @@ def article_priority_score(article: NewsArticle) -> int:
     payload = _normalize_text(_article_text_payload(article))
     industry_hits = sum(1 for kw in INDUSTRY_KEYWORDS if kw in payload)
     event_hits = sum(1 for kw in MARKET_EVENT_KEYWORDS if kw in payload)
-
     return industry_hits + (event_hits * 2)
 
 
 def deduplicate_articles(articles: Iterable[NewsArticle]) -> tuple[List[NewsArticle], int]:
+    articles_list = list(articles)
     unique_map: dict[str, NewsArticle] = {}
 
-    for article in articles:
+    for article in articles_list:
         stable_key_raw = f"{article.title.lower().strip()}|{article.link.lower().strip()}"
         stable_key = sha1(stable_key_raw.encode("utf-8")).hexdigest()
         if stable_key not in unique_map:
             unique_map[stable_key] = article
 
     unique_articles = list(unique_map.values())
-    duplicate_dropped_count = max(0, len(list(articles)) - len(unique_articles))
+    duplicate_dropped_count = max(0, len(articles_list) - len(unique_articles))
     return unique_articles, duplicate_dropped_count
 
 
 def filter_important_news(articles: Iterable[NewsArticle], top_k: int = 15) -> FilterResult:
-    articles_list = list(articles)
-    deduped, duplicate_dropped_count = deduplicate_articles(articles_list)
+    deduped, duplicate_dropped_count = deduplicate_articles(articles)
 
     relevant = [
         article

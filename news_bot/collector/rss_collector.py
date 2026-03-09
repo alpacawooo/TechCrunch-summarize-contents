@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, List
-
-import feedparser
-import requests
-from bs4 import BeautifulSoup
+from html import unescape
+from typing import Any, Iterable, List
 
 REQUEST_TIMEOUT = 12
+REQUEST_HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; news-bot/1.0)"}
 
 
 @dataclass
@@ -31,7 +30,7 @@ DEFAULT_FEEDS = {
 }
 
 
-def _format_published(entry: feedparser.FeedParserDict) -> str:
+def _format_published(entry: dict[str, Any]) -> str:
     published_parsed = entry.get("published_parsed")
     if not published_parsed:
         return "unknown"
@@ -40,13 +39,30 @@ def _format_published(entry: feedparser.FeedParserDict) -> str:
     return dt.isoformat()
 
 
+def _clean_text(text: str) -> str:
+    try:
+        from bs4 import BeautifulSoup
+    except ModuleNotFoundError:
+        # Fallback when dependency is missing in restricted test/runtime env.
+        return unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text or "")).strip())
+
+    without_tags = BeautifulSoup(text or "", "html.parser").get_text(" ", strip=True)
+    return unescape(re.sub(r"\s+", " ", without_tags)).strip()
+
+
 def fetch_article_text(url: str, timeout: int = REQUEST_TIMEOUT) -> str:
     """Fetch and parse article body text from URL.
 
     This is best-effort: failures return an empty string.
     """
     try:
-        response = requests.get(url, timeout=timeout)
+        import requests
+        from bs4 import BeautifulSoup
+    except ModuleNotFoundError:
+        return ""
+
+    try:
+        response = requests.get(url, headers=REQUEST_HEADERS, timeout=timeout)
         response.raise_for_status()
     except requests.RequestException:
         return ""
@@ -59,10 +75,10 @@ def fetch_article_text(url: str, timeout: int = REQUEST_TIMEOUT) -> str:
     return text[:5000]
 
 
-def _entry_to_article(entry: feedparser.FeedParserDict, source: str, fetch_full_text: bool = False) -> NewsArticle:
-    title = entry.get("title", "(no title)").strip()
+def _entry_to_article(entry: dict[str, Any], source: str, fetch_full_text: bool = False) -> NewsArticle:
+    title = _clean_text(entry.get("title", "(no title)"))
     link = entry.get("link", "").strip()
-    summary = entry.get("summary", "").strip()
+    summary = _clean_text(entry.get("summary", ""))
     published = _format_published(entry)
 
     content = ""
@@ -85,7 +101,21 @@ def collect_from_feed(
     limit_per_source: int = 20,
     fetch_full_text: bool = False,
 ) -> List[NewsArticle]:
-    parsed = feedparser.parse(feed_url)
+    try:
+        import feedparser
+        import requests
+    except ModuleNotFoundError:
+        return []
+
+    try:
+        response = requests.get(feed_url, headers=REQUEST_HEADERS, timeout=REQUEST_TIMEOUT)
+        response.raise_for_status()
+        parsed = feedparser.parse(response.content)
+    except requests.RequestException:
+        return []
+
+    if getattr(parsed, "bozo", False) and not getattr(parsed, "entries", []):
+        return []
 
     articles: List[NewsArticle] = []
     for entry in parsed.entries[:limit_per_source]:

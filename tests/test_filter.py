@@ -1,7 +1,7 @@
 import unittest
 
 from news_bot.collector.rss_collector import NewsArticle
-from news_bot.filter.news_filter import filter_important_news
+from news_bot.filter.news_filter import deduplicate_articles, filter_important_news
 
 
 class FilterTests(unittest.TestCase):
@@ -19,6 +19,19 @@ class FilterTests(unittest.TestCase):
         self.assertEqual(result.irrelevant_dropped_count, 1)
         self.assertEqual(result.topk_dropped_count, 1)
         self.assertEqual(result.dropped_count, 3)
+
+    def test_deduplicate_accepts_iterable_generator(self):
+        articles = (
+            article
+            for article in [
+                NewsArticle("A", "https://a", "S", "2026", "", ""),
+                NewsArticle("A", "https://a", "S", "2026", "", ""),
+                NewsArticle("B", "https://b", "S", "2026", "", ""),
+            ]
+        )
+        unique, dropped = deduplicate_articles(articles)
+        self.assertEqual(len(unique), 2)
+        self.assertEqual(dropped, 1)
 
 
 if __name__ == "__main__":

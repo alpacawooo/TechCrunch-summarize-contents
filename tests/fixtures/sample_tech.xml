@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+  <channel>
+    <title>Sample Tech Feed</title>
+    <link>https://example.com</link>
+    <description>Sample feed for offline testing</description>
+    <item>
+      <title>NVIDIA raises AI chip guidance</title>
+      <link>https://example.com/nvidia-guidance</link>
+      <pubDate>Mon, 09 Mar 2026 10:00:00 GMT</pubDate>
+      <description><![CDATA[AI chip demand and data center expansion drive stronger outlook.]]></description>
+    </item>
+    <item>
+      <title>Fed hints at interest rate hold</title>
+      <link>https://example.com/fed-hold</link>
+      <pubDate>Mon, 09 Mar 2026 11:00:00 GMT</pubDate>
+      <description><![CDATA[Markets monitor guidance as inflation data cools.]]></description>
+    </item>
+    <item>
+      <title>Weekend sports roundup</title>
+      <link>https://example.com/sports</link>
+      <pubDate>Mon, 09 Mar 2026 12:00:00 GMT</pubDate>
+      <description><![CDATA[Football results and transfer rumors.]]></description>
+    </item>
+  </channel>
+</rss>

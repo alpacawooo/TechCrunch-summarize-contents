@@ -1,0 +1,66 @@
+"""Main entrypoint for AI/stock news automation project."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+
+from news_bot.collector.rss_collector import collect_all
+from news_bot.filter.news_filter import filter_important_news
+from news_bot.output.markdown_writer import render_markdown, write_markdown_file
+from news_bot.notification.slack_notifier import send_news_briefing_to_slack
+from news_bot.summarizer.news_summarizer import summarize_news
+
+
+def positive_int(value: str) -> int:
+    num = int(value)
+    if num <= 0:
+        raise argparse.ArgumentTypeError("양의 정수를 입력하세요.")
+    return num
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="AI/주식 뉴스 자동 수집 및 요약")
+    parser.add_argument("--limit-per-source", type=positive_int, default=20, help="소스별 최대 수집 개수")
+    parser.add_argument("--top-k", type=positive_int, default=15, help="최종 선별 뉴스 개수")
+    parser.add_argument("--output-dir", default="output", help="마크다운 파일 저장 디렉터리")
+    parser.add_argument("--fetch-full-text", action="store_true", help="RSS 요약 외에 기사 본문도 수집")
+    parser.add_argument("--model", default="gpt-4o-mini", help="OpenAI 모델명")
+    parser.add_argument("--skip-slack", action="store_true", help="Slack 전송 단계를 건너뜁니다")
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+
+    try:
+        collected = collect_all(limit_per_source=args.limit_per_source, fetch_full_text=args.fetch_full_text)
+        if not collected:
+            raise RuntimeError("RSS 수집 결과가 없습니다. 네트워크/피드 URL을 확인하세요.")
+
+        filtered_result = filter_important_news(collected, top_k=args.top_k)
+        if not filtered_result.selected:
+            raise RuntimeError("필터링 후 남은 뉴스가 없습니다. 키워드/수집 범위를 조정하세요.")
+
+        summarized = summarize_news(filtered_result.selected, model=args.model)
+        md_content = render_markdown(summarized)
+        output_path = write_markdown_file(md_content, output_dir=args.output_dir)
+
+        if not args.skip_slack:
+            send_news_briefing_to_slack(summarized, max_items=min(5, args.top_k))
+    except Exception as exc:  # noqa: BLE001
+        print(f"[오류] 실행 중 문제가 발생했습니다: {exc}", file=sys.stderr)
+        raise SystemExit(1) from exc
+
+    print("[완료] 뉴스 수집/필터링/요약/저장이 완료되었습니다.")
+    print(f"- 수집 개수: {len(collected)}")
+    print(f"- 선별 개수: {len(filtered_result.selected)}")
+    print(f"- 제외(중복): {filtered_result.duplicate_dropped_count}")
+    print(f"- 제외(비관련): {filtered_result.irrelevant_dropped_count}")
+    print(f"- 제외(top-k): {filtered_result.topk_dropped_count}")
+    print(f"- 제외(총합): {filtered_result.dropped_count}")
+    print(f"- 저장 파일: {output_path}")
+
+
+if __name__ == "__main__":
+    main()

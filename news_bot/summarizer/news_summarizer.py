@@ -8,8 +8,10 @@ from typing import List
 from news_bot.collector.rss_collector import NewsArticle
 from news_bot.filter.news_filter import INDUSTRY_KEYWORDS, MARKET_EVENT_KEYWORDS
 
+
 def _call_openai(article: NewsArticle) -> dict:
     raise NotImplementedError("OpenAI summarization is not implemented yet.")
+
 
 @dataclass
 class SummarizedNews:
@@ -129,11 +131,13 @@ def summarize_article(article: NewsArticle) -> SummarizedNews:
         )
 
 
-def summarize_news(articles: List[NewsArticle]) -> List[SummarizedNews]:
-    return [summarize_article(article) for article in articles]
 def summarize_daily_overview(items: List[SummarizedNews]) -> str:
     if not items:
         return "오늘은 공유할 핵심 뉴스가 없습니다."
 
     titles = [item.title for item in items[:3]]
     return "오늘의 핵심 뉴스: " + " / ".join(titles)
+
+
+def summarize_news(articles: List[NewsArticle]) -> List[SummarizedNews]:
+    return [summarize_article(article) for article in articles]

@@ -100,16 +100,33 @@ def _insta_hooks(article: NewsArticle) -> List[str]:
 
 
 def summarize_article(article: NewsArticle) -> SummarizedNews:
-    return SummarizedNews(
-        title=article.title,
-        source=article.source,
-        link=article.link,
-        published=article.published,
-        core_summary_lines=[_line_one(article), _line_two(article), _line_three(article)],
-        why_important=_why_important(article),
-        investor_points=_investor_points(article),
-        insta_hooks=_insta_hooks(article),
-    )
+    try:
+        result = _call_openai(article)
+
+        return SummarizedNews(
+            title=result.get("title", article.title),
+            source=result.get("source", article.source),
+            link=result.get("link", article.link),
+            published=result.get("published", article.published),
+            core_summary_lines=result.get(
+                "core_summary_lines",
+                [_line_one(article), _line_two(article), _line_three(article)],
+            ),
+            why_important=result.get("why_important", _why_important(article)),
+            investor_points=result.get("investor_points", _investor_points(article)),
+            insta_hooks=result.get("insta_hooks", _insta_hooks(article)),
+        )
+    except Exception:
+        return SummarizedNews(
+            title=article.title,
+            source=article.source,
+            link=article.link,
+            published=article.published,
+            core_summary_lines=[_line_one(article), _line_two(article), _line_three(article)],
+            why_important=_why_important(article),
+            investor_points=_investor_points(article),
+            insta_hooks=_insta_hooks(article),
+        )
 
 
 def summarize_news(articles: List[NewsArticle]) -> List[SummarizedNews]:

@@ -8,6 +8,8 @@ from typing import List
 from news_bot.collector.rss_collector import NewsArticle
 from news_bot.filter.news_filter import INDUSTRY_KEYWORDS, MARKET_EVENT_KEYWORDS
 
+def _call_openai(article: NewsArticle) -> dict:
+    raise NotImplementedError("OpenAI summarization is not implemented yet.")
 
 @dataclass
 class SummarizedNews:

@@ -1,15 +1,15 @@
 # AI / 주식 뉴스 자동 수집 및 요약 프로젝트
 
-AI / 반도체 / 빅테크 / 매크로 관련 RSS 뉴스를 수집해,
-투자 콘텐츠용 요약 markdown을 생성하고 Slack 브리핑까지 자동 전송하는 프로젝트입니다.
+초보자도 실행할 수 있도록 만든 **RSS 기반 뉴스 봇**입니다.
 
-기본 파이프라인:
+아래 흐름을 자동으로 실행합니다.
 
 1. RSS 뉴스 수집 (TechCrunch, CNBC, Reuters, Yahoo Finance)
 2. 투자 관련 키워드/이벤트 기준 필터링
-3. 기사별 요약 생성 (OpenAI API 우선, 실패 시 규칙 기반 fallback)
+3. 투자자 관점 요약 생성
 4. Markdown 파일 저장
-5. Slack 브리핑 전송(Webhook 설정 시)
+
+- 네트워크/프록시 이슈로 특정 RSS가 실패하면 해당 소스는 자동으로 건너뛰고 나머지 소스로 계속 진행합니다.
 
 ---
 
@@ -25,30 +25,17 @@ news_bot/
     news_summarizer.py
   output/
     markdown_writer.py
-  notification/
-    slack_notifier.py
   main.py
 tests/
-  fixtures/
-    sample_tech.xml
-  test_collector.py
   test_filter.py
   test_markdown.py
-  test_sample_pipeline.py
-  test_slack_notifier.py
-  test_summarizer.py
-.github/
-  workflows/
-    ci-offline.yml
-    live-rss-run.yml
-    news_bot.yml
 requirements.txt
 README.md
 ```
 
 ---
 
-## 설치 및 환경변수
+## 설치 방법 (Python 3.10+)
 
 ```bash
 python3 -m venv .venv
@@ -56,111 +43,108 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+### 프록시 환경에서 설치가 403으로 실패할 때
+
+- 내부 PyPI 미러가 있다면 아래처럼 설치하세요.
+
 ```bash
-export OPENAI_API_KEY="your_api_key_here"
-export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/XXX/YYY/ZZZ"
+python3 -m pip install -r requirements.txt --index-url https://<internal-pypi>/simple --trusted-host <internal-pypi-host>
 ```
+
+- 또는 네트워크 팀에 `pypi.org`, `files.pythonhosted.org` 접근 허용을 요청하세요.
 
 ---
 
-## 실행
+## 실행 방법
+
+기본 실행:
 
 ```bash
 python3 -m news_bot.main
 ```
 
-Slack 전송 없이 실행:
+본문 크롤링까지 포함(선택):
 
 ```bash
-python3 -m news_bot.main --skip-slack
+python3 -m news_bot.main --fetch-full-text
 ```
 
----
+옵션 예시:
 
-## 요약 필드(강화)
-
-기사별로 아래 필드를 생성합니다.
-
-- `title`
-- `source`
-- `summary_3_lines`
-- `why_it_matters`
-- `investment_point`
-- `related_companies`
-- `theme_type` (`단기 이슈` / `장기 트렌드`)
-- `importance_level` (`낮음` / `중간` / `높음`)
-
----
-
-## Slack 브리핑 형식
-
-Slack에는 markdown 원문 전체가 아니라, **상위 중요 기사(top 3~5)** 브리핑만 전송합니다.
-중요도(`importance_level`) + 핵심 기업(OpenAI/NVIDIA/Microsoft/Google/Amazon/TSMC/AMD/ASML/Meta) + 키워드(실적/가이던스/규제/투자/공급망 등) 기준으로 우선순위를 정렬합니다.
-
-예시:
-
-```text
-[AI / 반도체 뉴스 브리핑]
-생성일: 2026-03-10
-총 기사 수: 5
-
-1) 기사 제목
-- 핵심 요약: ...
-- 왜 중요한가: ...
-- 투자 포인트: ...
-- 관련 기업: ...
-- 성격: 장기 트렌드
-- 중요도: 높음
-
-[오늘의 한줄 총평]
-- 오늘은 AI 인프라 투자와 반도체 공급망 이슈가 동시에 부각되며 대형 기술주 중심의 장기 성장 서사가 강화됐다.
+```bash
+python3 -m news_bot.main --limit-per-source 30 --top-k 20 --output-dir output --fetch-full-text
 ```
 
-- 메시지가 길면 자동 truncate 처리합니다.
-- Slack Block payload를 사용해 가독성을 높이고, `text` fallback도 함께 보냅니다.
+실행하면 아래 형식의 파일이 생성됩니다.
+
+- `output/news_YYYY_MM_DD.md`
+
+예)
+
+- `output/news_2026_03_09.md`
 
 ---
 
-## 오늘의 한줄 총평 생성 방식
-
-전체 기사 요약 결과를 바탕으로 아래 신호를 조합해 한 줄 총평을 생성합니다.
-
-- 중요도 높은 기사 개수
-- 장기 트렌드 기사 비중
-- 핵심 기업 노출 여부(NVIDIA/TSMC 등)
-
----
-
-## Slack Webhook / GitHub Secrets
-
-1. Slack 앱에서 Incoming Webhook 발급
-2. GitHub 저장소 `Settings → Secrets and variables → Actions`
-3. 아래 secret 등록
-   - `OPENAI_API_KEY`
-   - `SLACK_WEBHOOK_URL`
-
-`news_bot.yml`에서 다음과 같이 주입합니다.
-
-```yaml
-env:
-  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-  SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-```
-
----
-
-## 예외 처리 정책
-
-- OpenAI 키 미설정/호출 실패: 규칙 기반 요약 fallback으로 계속 진행
-- Slack Webhook 미설정: Slack 단계만 skip
-- Slack 전송 실패: 경고 로그 출력 후 워크플로우 계속 진행
-
----
-
-## 테스트
+## 테스트 실행
 
 ```bash
 python3 -m unittest discover -s tests -v
 ```
 
-오프라인 환경에서도 `tests/fixtures/sample_tech.xml` 기반으로 주요 파이프라인을 검증합니다.
+---
+
+## 필터링 기준
+
+### 1) 산업 키워드
+
+- AI, OpenAI, Anthropic, NVIDIA, Microsoft, Google, Amazon, Tesla
+- Semiconductor, GPU, LLM, Data center, AI chip
+- earnings, guidance, Fed, interest rate
+
+### 2) 시장 영향 이벤트
+
+- 실적 발표, 가이던스 변경
+- 대규모 투자, 인수합병(M&A)
+- 규제 변화, 금리 정책
+- AI 기술 발표, 반도체 공급 변화
+
+### 3) 중복 제거
+
+- 제목 + 링크를 기반으로 해시를 생성해 중복 뉴스 제거
+
+---
+
+## 출력 형식
+
+각 뉴스는 아래 구조로 저장됩니다.
+
+- 기사 제목
+- 출처
+- 핵심 요약 (3줄)
+  1. 무슨 일이 있었는지
+  2. 시장이 왜 반응할 수 있는지
+  3. 투자자가 체크할 포인트
+- 왜 중요한 뉴스인가
+  - AI 산업 영향
+  - 반도체 산업 영향
+  - 빅테크 기업 영향
+  - 금융시장 영향
+- 투자자 관점 포인트
+- 인스타 후킹 문장 3개
+
+---
+
+## 향후 확장 아이디어
+
+현재 구조는 다음 기능을 쉽게 추가할 수 있도록 모듈화되어 있습니다.
+
+- OpenAI API 요약
+- Notion 저장
+- Telegram 알림
+- 인스타 콘텐츠 자동 생성 강화
+
+확장 위치 예시:
+
+- `summarizer/news_summarizer.py`: LLM 요약 추가
+- `output/`: Notion/Telegram writer 추가
+- `main.py`: 실행 파이프라인에 후처리 단계 연결

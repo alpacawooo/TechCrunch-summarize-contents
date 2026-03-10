@@ -12,14 +12,12 @@ class SamplePipelineTests(unittest.TestCase):
     @patch("news_bot.summarizer.news_summarizer._call_openai")
     def test_pipeline_with_sample_rss_runs_without_network(self, mock_call):
         mock_call.return_value = {
-            "summary_3_lines": ["line1", "line2", "line3"],
-            "why_it_matters": "중요",
-            "investment_point": "포인트",
+            "three_line_summary": ["line1", "line2", "line3"],
+            "why_important": "중요",
             "related_companies": ["NVIDIA"],
-            "theme_type": "장기 트렌드",
-            "importance_level": "높음",
             "beneficiary_sectors": ["반도체"],
             "risk_sectors": ["소비재"],
+            "time_horizon": "장기 트렌드",
             "insta_hooks": ["h1", "h2", "h3"],
         }
 
